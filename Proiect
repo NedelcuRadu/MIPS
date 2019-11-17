@@ -1,0 +1,143 @@
+
+.data
+	encrypt: .space 400 # Va tine minte Z(p-1) -> Z*(p)
+	decrypt: .space 400 # Va tine minte Z*(p) -> Z(p-1)
+	notprim:.asciiz "Nu e prim"
+	generator: .asciiz "Generatorul g este: "
+	prim: .asciiz "Nr prim"
+	spatiu: .asciiz " "
+	endl: .asciiz "\n"
+	mesaj: .space 400
+.text
+
+main:	# Citesc p
+	# Verific daca e prim
+	# Daca nu e prim, afisam notprim si inchidem programul
+	# Daca e prim, aflam generatorul luand toate resturile modulo p > 1 si aflandu-le ordinul. Daca ajungem ca ordinul elementului > (p-1)/2, atunci acesta este generator. (Ordinul unui element divide ordinul grupului)
+	# Aflam izomorfismul si tinem minte in 2 vectori valorile (unul pt criptare si unul pt decriptare)
+
+	li $v0, 5 	# READ INT (p)
+	syscall 
+	move $t0, $v0 	# $t0 = p
+	li $t1,2 	# $t1 va fi pe post de "i" pt a verifica daca p e prim
+	div $t2,$t0,2	# $t2 = p/2 
+	addi $t2,1	# $t2 = p/2 + 1 (unde ne oprim din verificarea lui p)
+	li $t6,4	# $t6 constant 4, folosit pt a face inmultirile pt pozitiile din vectori
+	li $t7,1	# $t7 constant 1
+	j checkprim
+
+checkprim:	bgt $t1,$t2,pregen	# Nu se mai respecta i < p/2 + 1, deci p e prim, putem afla generatorul		
+		rem $t3,$t0,$t1 	# $t3 = p % i
+		beq $t3,$0,nonprim 	# Daca restul e 0, p nu e prim
+		addi $t1,$t1,1	   	# i++
+		j checkprim		# Continuam loop-ul
+
+nonprim: 	la $a0, notprim
+		li $v0,4
+		syscall
+		j exit
+
+pregen: li $t1,1		# Punem in vectori valorile care nu se schimba indiferent de izomorfism
+	sw $t1,encrypt($0) 	# 0 se duce mereu in 1		
+	sw $0, decrypt($t6)	# 1 decriptat da 0 mereu
+	li $t1,2 		# $t1 va fi pe post de "i"
+	li $t2, 1 		# $t2 va retine ordinul actual al elementului
+	li $t3,2 		# $t3 va retine puterea curenta
+	move $t4, $t0 		# $t4 = $t0 = p
+	addi $t4,-1 		# $t4 = p-1 (p e prim, deci p-1 e par)
+	div $t4,$t4,2 		# $t4 = (p-1)/2
+
+gen:	# Gasim generatorul si salvam primele puteri
+	# $t0=p $t1=i $t2=ordinul elementului $t3=puterea curenta $t4=(p-1)/2, ordinul la care ne oprim, $t5 va accesa memoria, $t6 constant 4
+
+	bgt $t2,$t4, printgen 	# Nu se mai respecta ordin < (p-1)/2, deci i este g
+	beq $t3,1,increment 	# Daca puterea e 1, am gasit ordinul elementului si trecem la urmatorul
+	mul $t3,$t3,$t1		# putere = putere * i
+	rem $t3, $t3, $t0 	# putere = putere % p
+	addi $t2,1		# ordin ++
+	mul $t5,$t2,$t6		# Determinam pozitia in encrypt
+	sw $t3,encrypt($t5)	# Salvam puterea in encrypt
+	mul $t5,$t3,$t6		# Determinam pozitia in decrypt
+	sw $t2, decrypt($t5)	# Salvam valoarea in decrypt
+	j gen			# Continuam loop-ul
+	
+	
+increment: addi $t1,1 		# i++
+	   li $t2, 1 		# Resetam ordinul elementului
+	   mul $t5,$t6,$t1	# Ca sa gasim pozitia din decrypt va fi 4*generator si ii corespunde 1
+	   sw $t7,decrypt($t5)	
+	   move $t3, $t1 	# Prima putere e elementul in sine
+	   j gen		# Verificam noua valoare daca e generator
+
+printgen: #Am gasit generatorul, il afisam 
+
+	  la $a0, generator # Afiseaza "Generatorul g este: "
+	  li $v0, 4
+	  syscall 
+	  move $a0,$t1	    # Afiseaza g
+	  li $v0,1
+	  syscall 
+	  la $a0, endl 	    # Pune "\n"
+	  li $v0,4
+	  syscall	
+	
+puteri: # La momentul actual avem calculat o parte din izomorfism, trebuie determinate si restul valorilor
+	# $t0=p $t1=g $t2=ordinul elementului $t3=puterea curenta $t4=(p-1)/2, ordinul la care ne oprim ,$t5 va accesa memoria, $t6 constant 4
+	beq $t3,1,citire 	# Daca puterea e 1, am determinat toate valorile
+	mul $t3,$t3,$t1		# putere = putere * i
+	rem $t3, $t3, $t0 	# putere = putere % p
+	addi $t2,1		# ordin ++
+	mul $t5,$t2,$t6		# Determinam pozitia in encrypt
+	sw $t3,encrypt($t5)	# Salvam puterea in encrypt
+	mul $t5,$t3,$t6		# Determinam pozitia in decrypt
+	sw $t2, decrypt($t5)	# Salvam valoarea in decrypt
+	j puteri
+	
+citire: la $a0, mesaj		# Citim mesajul
+	li $a1, 400
+	li $v0,8
+	syscall
+	li $t2,0		
+	li $t4,1
+	sw $0, decrypt($t6)	# Cand am calculat izomorfismul, am sarit peste primele 2 val
+	sw $t1,	encrypt($t6)	# Lui 1 ii corespunde g in encrypt
+	mul $t1,$t1,$t6		# Nu mai avem nevoie de generator, putem sa refolosim registrul
+	sw $t4, decrypt($t1)	# Lui g ii corespunde 1 in decrypt
+	
+
+traducere: 	# Criptam mesajul
+	 	lb $t9, mesaj($t2) 	# mesaj contine char, folosim lb
+		beqz $t9,citire2	# Daca am ajuns la finalul mesajului, ne oprim
+		addi $t9,-65		# Scadem codul ASCII al lui "A"
+		mul $t9, $t9,$t6	# Calculam pozitia din encrypt inmultind cu 4
+		lw $a0, encrypt($t9)	# Encrypt contine numere, folosim lw
+		addi $a0,65		# Adunam codul ASCII al lui "A"
+		li $v0,11		# Print byte
+		syscall	
+		addi $t2,1		# Trecem la urmatorul caracter
+		j traducere
+
+citire2: #Citim mesajul criptat si ne pregatim pt decriptare
+	la $a0, mesaj		# Citim mesajul
+	li $a1, 400
+	li $v0,8
+	syscall
+	li $t2,0 		# $t2 va accesa memoria din mesaj, creste din 1 in 1
+	la $a0, endl        	# Punem endline
+	li $v0,4
+	syscall
+	
+decriptare: 	#Decriptam mesajul
+		lb $t9, mesaj($t2) 	# mesaj contine char, folosim lb
+		beqz $t9,exit		# Daca am ajuns la finalul mesajului, ne oprim
+		addi $t9,-65		# Scadem codul ASCII al lui "A"
+		mul $t9, $t9,$t6 	# Calculam pozitia din decrypt inmultind cu 4
+		lw $a0, decrypt($t9)	# Decrypt contine numere, folosim lw
+		addi $a0,65		# Adunam codul ASCII al lui "A"
+		li $v0,11		# Print byte
+		syscall	
+		addi $t2,1		# Trecem la urmatorul caracter
+		j decriptare
+	
+exit:	li $v0, 10
+	syscall
