@@ -1,0 +1,5 @@
+Greutate:
+50 =  10 + 20 +0.67*30 
+
+Valoare obiecte din rucsac:
+ 60 + 100 + 0.67*120 = 240.0
