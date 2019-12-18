@@ -1,0 +1,1 @@
+[{'nume': 'Copaceanu Mircea', 'varsta': 29, 'salariu': 7569}, {'nume': 'Eremia Andreea', 'varsta': 54, 'salariu': 5000}, {'nume': 'Mihalache Ionut', 'varsta': 54, 'salariu': 2439}, {'nume': 'Mirea Elena', 'varsta': 45, 'salariu': 3890}, {'nume': 'Popescu Mariana', 'varsta': 32, 'salariu': 7569}]
